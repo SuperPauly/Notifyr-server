@@ -1,0 +1,15 @@
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
+.env
+data/
+*.sqlite*
+*.pem
+dist/
+
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
