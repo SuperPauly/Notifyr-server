@@ -1,0 +1,112 @@
+syntax = "proto3";
+
+// v2 changes notification IDs from string to int64.
+package notifications.v2;
+
+import "google/protobuf/timestamp.proto";
+
+// Application API. Push delivery uses Web Push / UnifiedPush or FCM separately.
+// Authenticate each RPC through transport credentials, not user IDs in replies.
+service NotificationService {
+  // Trusted publishers only. Success means persisted, not delivered or read.
+  rpc Publish(PublishRequest) returns (Notification);
+  // The caller must be an intended recipient.
+  rpc Get(GetRequest) returns (NotificationState);
+  // A recipient submits a button selection or text reply.
+  rpc Respond(RespondRequest) returns (ResponseReceipt);
+}
+
+message PublishRequest {
+  // Publisher-generated UUID. Retry the identical request with the same ID.
+  string request_id = 1;
+  // One user = unicast; several users = application-level fan-out.
+  // The server authorises these targets and deduplicates users and endpoints.
+  repeated string recipient_user_ids = 2;
+  // id must be 0; created_at, from_server and from_app must be unset.
+  // The server assigns these fields before storing the record.
+  Notification notification = 3;
+}
+
+message Notification {
+  // Positive, persistent server-wide ID, unique across all apps on this server.
+  // The client key is (from_server, id), including for notification deduplication.
+  int64 id = 1;
+  string title = 2;
+  string body = 3;
+  // Empty = ordinary notification. Ordered actions = actionable notification.
+  // Clients put unsupported or excess actions on the notification's app page.
+  repeated Action actions = 4;
+  // Optional. The server rejects NEW responses at or after this instant.
+  google.protobuf.Timestamp expires_at = 5;
+  // App-relative path, such as /notifications/123. Never a response endpoint.
+  // Empty means use the app's standard notification page for this id.
+  string open_path = 6;
+  // UTC instant when the notification server creates the stored record.
+  // Assigned by the server. Required on delivered notifications.
+  google.protobuf.Timestamp created_at = 7;
+  // Stable, globally unique ID of the notification server that owns this record.
+  // Assigned from server configuration, independent of its current URL or IP.
+  string from_server = 8;
+  // Stable ID of the sending app within from_server.
+  // Derived from the authenticated publisher's registered app identity.
+  string from_app = 9;
+}
+
+message Action {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    BUTTON = 1;
+    TEXT_REPLY = 2;
+  }
+  // Unique within the notification; identifies server-defined behaviour.
+  string id = 1;
+  string label = 2;
+  // Required by server validation: BUTTON or TEXT_REPLY.
+  Kind kind = 3;
+}
+
+message GetRequest {
+  int64 notification_id = 1;
+  // Route through this server's configured connection; it verifies this ID.
+  string from_server = 2;
+}
+
+message NotificationState {
+  Notification notification = 1;
+  // Recipient-specific. After true, clients remove/disable response actions.
+  bool responded = 2;
+}
+
+message RespondRequest {
+  // Client-generated UUID, persisted before sending. Reuse it on retries.
+  string response_id = 1;
+  int64 notification_id = 2;
+  string action_id = 3;
+  // Must be absent for BUTTON; present and non-blank for TEXT_REPLY.
+  // Maximum UTF-8 size: 4096 bytes. Validate on the server.
+  optional string text = 4;
+  // Together with notification_id, identifies the notification being answered.
+  // Route to the registered connection for this server; it verifies this ID.
+  string from_server = 5;
+}
+
+message ResponseReceipt {
+  string response_id = 1;
+  google.protobuf.Timestamp accepted_at = 2;
+}
+
+// Server invariants:
+// - Derive the responder from authenticated credentials; check recipient access.
+// - Assign from_server, from_app and created_at from trusted server context.
+// - Keep server IDs and ID allocation stable across restarts; never reuse IDs.
+// - Resolve from_server through registered connections, never arbitrary URLs.
+// - Reject Get/Respond requests whose from_server differs from this server.
+// - Validate required IDs, targets, timestamps, action kinds and text limits.
+// - Reject missing/unknown actions and responses to actionless notifications.
+// - Store a response before returning its receipt or dispatching side effects.
+// - Scope retry IDs to the authenticated principal. Identical retries return
+//   the original receipt, including after expiry; changed payloads are rejected.
+// - Enforce one response per (from_server, notification_id, recipient_user_id).
+// ponytail: v2 allows one response per recipient per notification. Publish a new
+// notification for follow-ups; add an explicit response-policy field if shared
+// first-response-wins prompts or repeated replies are later required.

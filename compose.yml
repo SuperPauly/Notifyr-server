@@ -1,0 +1,40 @@
+services:
+  notifyr:
+    build: .
+    image: notifyr-server:local
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 45s
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    volumes:
+      - notifyr_data:/data
+    environment:
+      NOTIFYR_DB: /data/notifyr.sqlite
+      NOTIFYR_CORS_ORIGINS: ${NOTIFYR_CORS_ORIGINS:-}
+      NOTIFYR_PUSH_ORIGINS: ${NOTIFYR_PUSH_ORIGINS:-}
+      NOTIFYR_PRIVATE_PUSH_ORIGINS: ${NOTIFYR_PRIVATE_PUSH_ORIGINS:-}
+      NOTIFYR_VAPID_SUBJECT: ${NOTIFYR_VAPID_SUBJECT:-mailto:admin@example.invalid}
+      NOTIFYR_MAX_RECIPIENTS: ${NOTIFYR_MAX_RECIPIENTS:-100}
+      NOTIFYR_MAX_REQUEST_BYTES: ${NOTIFYR_MAX_REQUEST_BYTES:-131072}
+      FORWARDED_ALLOW_IPS: ${NOTIFYR_TRUSTED_PROXIES:-127.0.0.1}
+    expose: ["8080"]
+    networks: [pangolin]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: pangolin
+      traefik.http.routers.notifyr.rule: Host(`${NOTIFYR_HOST:-notifyr.example.invalid}`)
+      traefik.http.routers.notifyr.entrypoints: ${NOTIFYR_TRAEFIK_ENTRYPOINT:-websecure}
+      traefik.http.routers.notifyr.tls: "true"
+      traefik.http.services.notifyr.loadbalancer.server.port: "8080"
+
+volumes:
+  notifyr_data:
+
+networks:
+  pangolin:
+    external: true
+    name: pangolin
