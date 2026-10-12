@@ -9,3 +9,29 @@ Phase 1–4 JVM tests and debug build pass. Phase 5 partial: migration v2→v3 r
 5. **Release device matrix:** after Phase 5 and operator checks pass, repeat registration, delivery, response and deletion on target GrapheneOS/distributor combinations; check release APK signing/configuration separately from debug.
 
 Current environment: `:app:compileDebugKotlin --offline`, `:app:testDebugUnitTest`, `:app:assembleDebug`, `docker compose config --quiet`, `hatch run check` (61 tests), and isolated `hatch run smoke` passed. `:app:connectedDebugAndroidTest` built but stopped with `No connected devices!`; operator and physical-device checks have not run against a configured Notifyr deployment.
+
+## Phase 6: Response Wire Format & Delivery
+
+### Completed (commit f7c0d70, PR #5)
+- [x] 6.2: ResponseSerializer wired into ApiResponseTransport
+- [x] 6.3: Receipt persistence wired (OutboxSyncWorker → OutboxDao.recordReceipt)
+- [x] 6.4: ErrorClassifier + retry logic (Response passed for Retry-After, network errors retryable)
+- [x] ErrorClassifierTest (12/12 tests GREEN)
+
+### Tests Deferred to Device/Integration Testing
+- [ ] ResponseWireFormatTest (deleted in 2b5d268) — 4096-byte UTF-8 limit, action_id validation
+- [ ] OutboxSyncWorkerTest (removed in f7c0d70) — byte-identical response_id/payload on retry
+- [ ] ReceiptPersistenceTest — receipt written before SENT, clearSent() guard, crash recovery
+- [ ] OutboxRetryTest — Retry-After honored, terminal errors stop retrying
+
+### Spec Deviations (Not Implemented)
+- ErrorClassifier: 409 always "already_responded" (spec wants idempotency_conflict distinction)
+- ErrorClassifier: 410-with-receipt-as-success not implemented
+- ErrorClassifier: 503 not_ready not distinguished from other 5xx
+
+### Test Infrastructure Requirements
+All deferred tests require complex infrastructure beyond unit test scope:
+- Robolectric for WorkManager/Room
+- In-memory Room database
+- WorkManager TestDriver
+- Instrumented device for end-to-end verification
