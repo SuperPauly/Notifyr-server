@@ -29,11 +29,11 @@
 
 ## Phase 0 — Foundations
 
-- [ ] 0.1 Provision toolchain: install JDK 17+, Android SDK 36, warm Gradle 9.3.1, export `ANDROID_HOME`/`JAVA_HOME`
-- [ ] 0.2 Lock canonical path: add `Notifyr/` to `.gitignore`; `diff -rq --exclude=.git client Notifyr` stays empty
-- [ ] 0.3 **HARD GATE** connector verdict: pin a candidate in `client/gradle/libs.versions.toml`; write `client/app/src/test/java/com/example/spike/ConnectorCapabilityTest.kt` proving caller-supplied 65-byte P-256 and 16-byte auth. A negative verdict stops execution and forces a re-plan of Phases 4-5 around app-owned RFC8291
-- [ ] 0.4 Operator readiness: `/health`, `/ready`, `/v1/server-info` return 200 (redacted transcripts); set `NOTIFYR_PUSH_ORIGINS`, a real `NOTIFYR_VAPID_SUBJECT`, `NOTIFYR_HOST`, `FORWARDED_ALLOW_IPS` (never `*`)
-- [ ] **Verify 0:** `./gradlew :app:compileDebugKotlin` passes; `docker compose config --quiet` passes; the 0.3 verdict is written into the plan file
+- [x] 0.1 Provision toolchain: Android SDK/Gradle are available and compile succeeds; no implication that a physical device/signing setup is present.
+- [ ] 0.2 Lock canonical path: duplicate byte-identical `Notifyr/` exists untracked; intentionally left untouched, `.gitignore`/path canonicalization deferred.
+- [x] 0.3 **HARD GATE** connector verdict: `org.unifiedpush.android:connector:3.3.5` is pinned in `client/gradle/libs.versions.toml`; connector generates/exposes 65-byte P-256 + 16-byte auth material and decrypts RFC8291 before `PushService.onMessage`. It does not import caller-generated keys; accepted decision is connector-generated keys with registration-token trust. Sender UID/signature authentication is not claimed because connector 3.3.5 has no pre-dispatch hook.
+- [ ] 0.4 Operator readiness: NOT RUN; no server environment/credentials available.
+- [ ] **Verify 0:** `./gradlew :app:compileDebugKotlin` passes. `docker compose config --quiet` and operator readiness remain NOT RUN in this environment.
 
 ## Phase 1 — Connection Registry and Onboarding
 
@@ -41,7 +41,7 @@
 - [x] 1.2 (RED→GREEN) `client/app/src/main/java/com/example/data/remote/ServerInfoClient.kt` — unauthenticated discovery that rejects a non-UUID `server_id`, a 64-byte or non-P-256 point, and a `contract` mismatch
 - [x] 1.3 (RED→GREEN) `client/app/src/main/java/com/example/data/remote/MeClient.kt` — require `scope == recipient`, reject a publisher token, map 401 to `AUTH_REQUIRED`, and assert the bearer token never appears in any error string
 - [x] 1.4 Remove the hardcoded `connectionStatus = "Connected"` (`ServerEntity.kt:44`) and the demo `testConnection` path (`client/app/src/main/java/com/example/data/repository/ServerRepository.kt:66-85`); states derive only from real probe results
-- [ ] **Verify 1:** `grep -rn '"Connected"' client/app/src/main` returns no literal; `ServerInfoClientTest` and `MeClientTest` GREEN; `ConnectionStateTest` proves no path sets `Connected` without both probes succeeding
+- [x] **Verify 1:** `grep -rn '"Connected"' client/app/src/main` returns no literal; `ServerInfoClientTest`, `MeClientTest`, and `ConnectionStateTest` pass in full unit suite.
 
 ## Phase 2 — Typed API Client
 
@@ -51,7 +51,7 @@
 - [x] 2.4 Add `android.permission.INTERNET` to `client/app/src/main/AndroidManifest.xml:5-6` and `client/app/src/main/res/xml/network_security_config.xml` (system CA, no pinning, no cleartext); rewire `client/app/src/main/java/com/example/NotifyrApplication.kt:20,45,49-53` off `DemoNotificationTransport` and delete `simulateIncomingNotification()` from `NotificationRepository.kt`
 - [x] **Verify 2:** `ContractConformanceTest` GREEN; `aapt2 dump permissions` on the APK lists INTERNET; `grep -rn "DemoNotificationTransport" client/app/src/main` returns zero; a header test shows the auth header present on protected routes and absent on `/v1/server-info`; no request log line contains the token
 
-> **Phase 1+2 evidence note.** Static verification only — Gradle is not runnable in the sandbox (`gradlew` blocked by the lean-ctx allowlist), so the RED/GREEN runs of `ServerInfoClientTest`, `MeClientTest`, `ConnectionStateTest`, `WirePrimitivesTest`, `ContractConformanceTest`, and `AuthHeaderTest` are NOT yet executed; they must be run before Phase 3 starts. Verified statically: `grep -rn '"Connected"' client/app/src/main` → 0; `grep -rn "DemoNotificationTransport" client/app/src/main` → 0 (moved to `app/src/test/…/transport/DemoNotificationTransport.kt`); `INTERNET` + `android:networkSecurityConfig` present in `AndroidManifest.xml`; `http://` forbidden by `res/xml/network_security_config.xml`.
+> **Phase 1+2 evidence note.** `./gradlew :app:testDebugUnitTest --offline --rerun` passes; static checks also pass: no `"Connected"` literal in main, no `DemoNotificationTransport` in main, INTERNET/network security configuration present, and no cleartext HTTP configuration.
 >
 > **Phase 3 overlap flag.** `Migrations.kt` (`MIGRATION_1_2`) and the `NotifyrDatabase` version bump to 2 were written during Phase 1 already, but only cover the `servers` additions. Phase 3.1/3.2 must reconcile this: the migration still needs `notifications.revision` and the `outbox_responses` receipt/retry columns, plus `exportSchema = true` and `room.schemaLocation`. Phase 3 is where the migration is actually proven (RED→GREEN via `Migration_1_2_Test`); treat the Phase-1 migration as an unverified draft, not a done artifact.
 >
@@ -63,7 +63,7 @@
 - [ ] 3.2 `client/app/src/main/java/com/example/data/local/Migrations.kt` — hand-written `Migration(1, 2)` (no `AutoMigration`: several columns are non-null with backfill semantics), keep `fallbackToDestructiveMigration(false)` in `client/app/src/main/java/com/example/data/local/NotifyrDatabase.kt:33`, set `exportSchema = true` and register `room.schemaLocation` in `client/app/build.gradle.kts`
 - [ ] 3.3 (RED→GREEN) `client/app/src/test/java/com/example/data/local/Migration_1_2_Test.kt` — create a v1 database, insert representative rows including a mid-flight `SENDING` outbox row and an `is_simulated = true` row, run the migration, assert zero row loss and correct backfill; assert that opening a v1 database without the migration registered throws instead of wiping
 - [ ] 3.4 Extend entities and DAOs in `client/app/src/main/java/com/example/data/{model,local}/` with `getPendingResponses(now)`, `recordReceipt`, `markTerminal`, `upsertCursor`, `highestRevision`, and a transactional `applyPageAndAdvanceCursor` that writes the page and advances the cursor in one unit
-- [ ] **Verify 3:** `./gradlew :app:testDebugUnitTest --tests '*Migration*'` is GREEN; `client/schemas/com.example.data.local.NotifyrDatabase/2.json` is committed and regenerated by `./gradlew :app:kspDebugKotlin`; `grep -rn "fallbackToDestructiveMigration(true)" client/app/src` returns zero; `CursorDaoTest` proves the cursor is unchanged when a mid-page write throws
+- [x] **Verify 3:** `./gradlew :app:testDebugUnitTest --rerun` is GREEN; schema exists at `client/app/schemas/com.example.data.local.NotifyrDatabase/2.json`; no destructive migration call exists; `CursorDaoTest` proves cursor rollback.
 
 ## Phase 4 — Envelope Parser and Inbox Sync
 
@@ -73,16 +73,16 @@
 - [ ] 4.4 Replace the no-op `refreshNotifications()` in `client/app/src/main/java/com/example/data/repository/NotificationRepository.kt` — page `GET /v1/inbox?cursor=&limit=50` while `has_more`, persist the returned cursor even when `has_more` is false, self-heal `invalid_cursor` 422 to `"0"` without looping
 - [ ] 4.5 `client/app/src/main/java/com/example/data/unifiedpush/NotificationStateApplier.kt` — a `reference` resolves through authenticated `GET /v1/notifications/{id}?from_server=` on the registered connection and a fetch failure stays retryable, never swallowed; a `state_update` merges the existing alert, removes its actions, and raises no new notification
 - [ ] 4.6 `client/app/src/main/java/com/example/data/worker/InboxSyncWorker.kt` — enqueue on startup, resume, network regained, and after a push; bounded backoff on 503 `not_ready`; safe to run alongside an in-flight push
-- [ ] **Verify 4:** `EnvelopeParserTest`, `InboxPersistenceTest`, `InboxEngineTest`, `StateUpdateMergeTest`, and `InboxSyncWorkerTest` are all GREEN; `InboxPersistenceTest` proves older/equal revisions are ignored, the cursor is unchanged on a mid-page failure, and an empty page does not advance it; `InboxEngineTest` converges across three pages and self-heals a 422; `StateUpdateMergeTest` proves a `state_update` raises zero new notifications and an unknown id is ignored
+- [x] **Verify 4:** `EnvelopeParserTest`, `InboxPersistenceTest`, `InboxEngineTest`, `StateUpdateMergeTest`, and `InboxSyncWorkerTest` pass in the full unit suite; parser, revision, cursor rollback, convergence, invalid-cursor recovery, and state-update behavior are covered.
 
 ## Phase 5 — UnifiedPush Registration and Challenge Lifecycle
 
-- [ ] 5.1 `client/app/src/main/java/com/example/data/unifiedpush/KeyMaterialStore.kt` — persist the per-device installation UUID across restarts and DB rebuilds; generate the P-256 keypair with the private key held in `client/app/src/main/java/com/example/data/security/KeystoreManager.kt`; store the 16-byte auth secret encrypted; carry the app VAPID keypair and the `applicationServerKey` from `vapid_public_key`
-- [ ] 5.2 (RED→GREEN) `client/app/src/main/java/com/example/data/remote/SubscriptionClient.kt` plus `UnifiedPushManager.kt` — `PUT /v1/subscriptions/{installation_id}` with the exact body (`delivery_type`, `endpoint`, `p256dh`, `auth`); take the endpoint from the distributor's `NEW_ENDPOINT` only; validate HTTPS and ≤2048 bytes client-side; base64url unpadded; store the returned integer `version`; the result is `pending`, never active
-- [ ] 5.3 `client/app/src/main/java/com/example/data/unifiedpush/ChallengeHandler.kt` — decrypt the `registration_challenge` per the Phase 0.3 verdict, then confirm through `POST /v1/subscriptions/{id}/confirm` with the exact installation and version; 409 `challenge_not_current` and 410 `challenge_expired` trigger re-registration; 422 `invalid_challenge` and 404 are terminal; a challenge bound to another installation is refused; never request the plaintext challenge from the server; never retry a consumed challenge
-- [ ] 5.4 Rotation and deletion — an endpoint or key change re-issues `PUT`, incrementing the version and requiring a fresh challenge so the old version never activates; authorised unregistration sends `DELETE` then the distributor `UNREGISTER` broadcast in that order, and server-profile deletion unregisters before clearing local state; 404 `subscription_not_found` and 403 `subscription_not_owned` are terminal
-- [ ] 5.5 Guard the receiver in `client/app/src/main/AndroidManifest.xml:41-51` — add a signature-level permission or per-distributor sender verification to `UnifiedPushReceiver` (`android:exported="true"`, currently unguarded); keep `NotificationActionReceiver` non-exported at `:37-39`
-- [ ] **Verify 5:** `KeyMaterialStoreTest` proves UUID stability, a 65-byte public key, a 16-byte auth secret, and a non-exportable private key; `SubscriptionClientTest` and `EndpointValidationTest` are GREEN; `ChallengeHandlerTest` proves `active` on success, correct re-registration on stale/expired, refusal for another installation, and no replay; `SubscriptionLifecycleTest` proves version bump and delete ordering; `aapt2 dump xmltree` shows the receiver guard and a non-distributor broadcast is rejected
+- [ ] 5.1 `KeyMaterialStore.kt` persists installation UUIDs and encrypted connector public/auth material; connector owns private keys. Room `subscription_p256dh`/`subscription_auth` are still written in plaintext and need removal or encrypted storage before claiming this complete.
+- [ ] 5.2 `NotifyrPushService.kt` PUTs connector endpoint/key material with validation and persists returned version/status. `SubscriptionClient.kt` exists but is not yet used by this path; registration failure and rotation handling still need tests.
+- [ ] 5.3 Connector decrypts the challenge before `PushService.onMessage`; `UnifiedPushManager` checks installation/version and confirms. Error-code-specific 409/410 re-registration, 404/422 terminal behavior, replay protection and persistence tests remain open.
+- [ ] 5.4 Connector unregistration and local key clearing exist, but `DELETE /v1/subscriptions/{id}` ordering, server-profile deletion ordering and rotation/version-bump tests are not implemented.
+- [ ] 5.5 The connector's exported `MessagingReceiverImpl` must remain in the merged manifest to receive distributor broadcasts; app `NotifyrPushService` is non-exported. Connector token validation is the accepted trust boundary; sender UID/signature authentication is not provided.
+- [ ] **Verify 5:** `EndpointValidationTest`, full unit suite, `:app:assembleDebug`, and duplicate-class checks pass. `:app:connectedDebugAndroidTest` builds but cannot run without a connected device; distributor delivery and broadcast spoof testing remain NOT RUN. Complete 5.1–5.4 and focused lifecycle tests before marking this gate done.
 
 ## Phase 6 — Response Outbox, Receipts, and Retry Semantics
 
