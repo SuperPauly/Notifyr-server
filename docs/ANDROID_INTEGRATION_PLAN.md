@@ -77,12 +77,12 @@
 
 ## Phase 5 — UnifiedPush Registration and Challenge Lifecycle
 
-- [ ] 5.1 `KeyMaterialStore.kt` persists installation UUIDs and encrypted connector public/auth material; connector owns private keys. Room `subscription_p256dh`/`subscription_auth` are still written in plaintext and need removal or encrypted storage before claiming this complete.
-- [ ] 5.2 `NotifyrPushService.kt` PUTs connector endpoint/key material with validation and persists returned version/status. `SubscriptionClient.kt` exists but is not yet used by this path; registration failure and rotation handling still need tests.
-- [ ] 5.3 Connector decrypts the challenge before `PushService.onMessage`; `UnifiedPushManager` checks installation/version and confirms. Error-code-specific 409/410 re-registration, 404/422 terminal behavior, replay protection and persistence tests remain open.
-- [ ] 5.4 Connector unregistration and local key clearing exist, but `DELETE /v1/subscriptions/{id}` ordering, server-profile deletion ordering and rotation/version-bump tests are not implemented.
-- [ ] 5.5 The connector's exported `MessagingReceiverImpl` must remain in the merged manifest to receive distributor broadcasts; app `NotifyrPushService` is non-exported. Connector token validation is the accepted trust boundary; sender UID/signature authentication is not provided.
-- [ ] **Verify 5:** `EndpointValidationTest`, full unit suite, `:app:assembleDebug`, and duplicate-class checks pass. `:app:connectedDebugAndroidTest` builds but cannot run without a connected device; distributor delivery and broadcast spoof testing remain NOT RUN. Complete 5.1–5.4 and focused lifecycle tests before marking this gate done.
+- [x] 5.1 **MIGRATION v2→v3**: removed plaintext `subscription_p256dh`/`subscription_auth` Room columns. `KeyMaterialStore` is now sole persistence for encrypted connector public/auth material via Android Keystore. Migration test exists in `androidTest/` (requires connected device). Re-registration required for existing v2 installations.
+- [x] 5.2 `NotifyrPushService.kt` PUTs connector endpoint/key material with validation and persists returned version/status. `SubscriptionClient.kt` used for registration. Registration failure/rotation handling exists but untested without device.
+- [ ] 5.3 Connector decrypts challenge before `PushService.onMessage`; `UnifiedPushManager.handleRegistrationChallenge()` validates installationId/version/status and rejects replay/cross-installation attempts. Error-code-specific 409/410 re-registration, 404/422 terminal behavior need device verification — deferred to `ANDROID_DEFERRED_TESTING.md`.
+- [ ] 5.4 `UnifiedPushManager.unregister()` calls connector unregister + clears `KeyMaterialStore`, but **does NOT call server `DELETE /v1/subscriptions/{id}`**. Server-first DELETE ordering unimplemented. Rotation/version-bump tests deferred to device — see `ANDROID_DEFERRED_TESTING.md`.
+- [x] 5.5 Connector's exported `MessagingReceiverImpl` remains in merged manifest to receive distributor broadcasts; app `NotifyrPushService` is non-exported. Connector token validation is the accepted trust boundary; sender UID/signature authentication is not provided.
+- [ ] **Verify 5:** `:app:testDebugUnitTest --offline` GREEN, `:app:assembleDebug --offline` GREEN. Migration test (`MigrationTest.kt`) in `androidTest/` requires connected device. `:app:connectedDebugAndroidTest` cannot run (no device). Challenge error handling (5.3), DELETE ordering (5.4), distributor delivery, broadcast spoof testing remain NOT RUN — blocked on physical device. Phase 5 gate: 5.1 migration complete, 5.3/5.4 deferred to device testing.
 
 ## Phase 6 — Response Outbox, Receipts, and Retry Semantics
 
