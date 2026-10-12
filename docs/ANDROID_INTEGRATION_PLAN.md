@@ -29,11 +29,11 @@
 
 ## Phase 0 — Foundations
 
-- [x] 0.1 Provision toolchain: Android SDK/Gradle are available and compile succeeds; no implication that a physical device/signing setup is present.
-- [ ] 0.2 Lock canonical path: duplicate byte-identical `Notifyr/` exists untracked; intentionally left untouched, `.gitignore`/path canonicalization deferred.
-- [x] 0.3 **HARD GATE** connector verdict: `org.unifiedpush.android:connector:3.3.5` is pinned in `client/gradle/libs.versions.toml`; connector generates/exposes 65-byte P-256 + 16-byte auth material and decrypts RFC8291 before `PushService.onMessage`. It does not import caller-generated keys; accepted decision is connector-generated keys with registration-token trust. Sender UID/signature authentication is not claimed because connector 3.3.5 has no pre-dispatch hook.
-- [ ] 0.4 Operator readiness: NOT RUN; no server environment/credentials available.
-- [ ] **Verify 0:** `./gradlew :app:compileDebugKotlin` passes. `docker compose config --quiet` and operator readiness remain NOT RUN in this environment.
+- [x] 0.1 Provision toolchain: JDK 25, Android SDK platforms 36/36.1, Gradle 9.3.1, and Build Tools 36.0.0 available. `:app:compileDebugKotlin --offline` passes.
+- [x] 0.2 Lock canonical path: `client/` remains the only tracked submodule; `Notifyr/` is ignored by `.gitignore` and untouched. Clone comparison shows divergence, so byte-identical equivalence is not claimed.
+- [x] 0.3 **HARD GATE** connector verdict: `org.unifiedpush.android:connector:3.3.5` is pinned; connector generates/exposes 65-byte P-256 + 16-byte auth material and decrypts RFC8291 before `PushService.onMessage`. It does not import caller-generated keys; accepted decision is connector-generated keys with registration-token trust. Sender UID/signature authentication is not provided.
+- [ ] 0.4 Operator readiness: compose defaults still use `example.invalid` placeholders and no local `.env` or Notifyr compose deployment is configured. `hatch run smoke` passed isolated container readiness/auth/persistence checks; local port 8080 is an unrelated service (`/health` 200, `/ready` and `/v1/server-info` 404). Actual target deployment configuration remains unverified.
+- [ ] **Verify 0:** `:app:compileDebugKotlin --offline`, `docker compose config --quiet`, server `hatch run check`, and isolated `hatch run smoke` pass; connector verdict is recorded. Phase 0 remains gated on operator readiness against the actual configured Notifyr deployment.
 
 ## Phase 1 — Connection Registry and Onboarding
 
