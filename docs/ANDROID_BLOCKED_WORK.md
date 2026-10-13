@@ -47,7 +47,7 @@ Toolchain at run time: `openjdk 25.0.4.1`, Gradle 9.3.1 wrapper, `local.properti
 ## Phase 7 blockers
 
 - **7.1 UX honesty.** Settings no longer presents the false `"Awaiting server integration"` status; full server onboarding state tests remain open.
-- **7.4 release hygiene.** Demo tokens and unused Google/Firebase build gates are removed. Release assembly remains unverified because offline dependency cache lacks `androidx.concurrent:concurrent-futures-ktx:1.1.0`; application ID remains owner-reviewable.
+- **7.4 release hygiene.** Demo tokens and unused Google/Firebase build gates are removed. Unsigned release assembly succeeds; production signing requires `KEYSTORE_PATH`, `STORE_PASSWORD`, and `KEY_PASSWORD`. Application ID remains owner-reviewable.
 
 ## Phase 8 blockers
 
@@ -65,7 +65,7 @@ All Phase 8 gates are NOT RUN.
 |---|---|
 | `hatch run check` (server, 61 pytest cases) | Not run this session; only Android docs were in scope. |
 | `./gradlew :app:connectedDebugAndroidTest` | `No connected devices!`; no emulator or physical device attached. |
-| `./gradlew :app:assembleRelease --offline` | Blocked by missing cached `androidx.concurrent:concurrent-futures-ktx:1.1.0`; no credentials were fabricated. |
+| `./gradlew :app:assembleRelease --offline` | Produces `app-release-unsigned.apk`; signed production APK requires configured keystore secrets. |
 | `aapt2 dump permissions` / DEX `tok_` scan | Depends on a release APK that was not built. |
 | Operator deployment validation (`docker compose config`, live `/v1/server-info`, VAPID subject, trusted-proxy IPs) | No configured Notifyr deployment; local port 8080 serves an unrelated process. |
 | Physical device matrix (register → challenge → deliver → respond → delete) | No device or distributor available. |

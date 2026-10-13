@@ -31,7 +31,7 @@ Server: `git rev-parse --short HEAD` = `c9a0d9b docs: add Phase 6 section to AND
 
 - Server `hatch run check` (61 pytest) and `hatch run smoke`: out of scope this session (Android docs only).
 - `:app:connectedDebugAndroidTest`: `No connected devices!`.
-- `:app:assembleRelease`, `aapt2 dump permissions`, DEX `tok_` scan: release build not run; `google-services` decision unresolved.
+- Signed release APK and physical APK inspection: unsigned `:app:assembleRelease --offline` output exists; production signing secrets and device tooling are unavailable.
 - Physical device / distributor matrix, operator deployment validation: no device and no configured Notifyr deployment.
 
 ## Follow-ups
