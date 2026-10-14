@@ -2,7 +2,7 @@
 
 **Goal.** Make `Notifyr-server` deliver notifications to, and receive responses from, the Notifyr Android app (`SuperPauly/Notifyr`) against the frozen `notifications.v2` HTTPS contract. No server contract change.
 
-**Canonical path.** `client/` is the registered submodule. The server gitlink is `66fdef9` (client commit `build: allow unsigned local release APK`). The client worktree is checked out on branch `phase-6-completion` at `66fdef9`, which is **not merged** into `origin/main` (8 commits ahead, 13 behind). `OutboxRepository.kt` and `OutboxSyncEngine.kt` carry uncommitted local edits, and `OutboxRepositoryValidationTest.kt` and `OutboxFailurePathTest.kt` are untracked. `Notifyr/` is an untracked clone (`.gitignore:8`), not byte-identical to `client/`; ignore it, never edit or delete it.
+**Canonical path.** `client/` is the registered submodule. The server gitlink is `1b9b625` (client commit `ci: require release signing secrets`). The client worktree is checked out on branch `phase-6-completion` at `1b9b625`, which is **not merged** into `origin/main`. Client worktree is clean. `Notifyr/` is an untracked clone (`.gitignore:8`), not byte-identical to `client/`; ignore it, never edit or delete it.
 
 **TDD rule.** RED test → implementation → GREEN, in that order. No implementation lands before its test.
 

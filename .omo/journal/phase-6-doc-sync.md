@@ -1,7 +1,7 @@
 # Journal: Android integration doc sync
 
 **Date:** 2026-10-13
-**Branch:** `phase-6-completion` (server), client worktree `phase-6-completion` @ `66fdef9` (unmerged)
+**Branch:** `phase-6-completion` (server), client worktree `phase-6-completion` @ `1b9b625` (unmerged)
 
 ## What changed
 

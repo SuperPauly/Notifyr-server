@@ -12,7 +12,7 @@ Current environment (verified 2026-10-13): `cd client && ./gradlew :app:testDebu
 
 ## Phase 6: Response Wire Format & Delivery
 
-Branch `phase-6-completion` @ `66fdef9` is **not merged** into `origin/main` (8 commits ahead, 13 behind). The worktree also carries uncommitted edits to `OutboxRepository.kt` and `OutboxSyncEngine.kt`, plus untracked `OutboxRepositoryValidationTest.kt` and `OutboxFailurePathTest.kt`. Do not treat any of this as released.
+Branch `phase-6-completion` @ `1b9b625` is **not merged** into `origin/main`. Client worktree is clean. Do not treat any of this as released.
 
 ### Implemented in the unmerged worktree
 - [x] 6.2: ResponseSerializer wired into ApiResponseTransport; OutboxRepository sets isSimulated = false

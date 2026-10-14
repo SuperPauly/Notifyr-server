@@ -8,13 +8,13 @@ Last updated 2026-10-14 on server branch `phase-6-completion`. This document rec
 |---|---|
 | Server branch | `phase-6-completion` (up to date with origin) |
 | Server HEAD | `fe832ac docs: record release verification` |
-| Server submodule gitlink | `client` @ `66fdef9` (client `build: allow unsigned local release APK`) |
+| Server submodule gitlink | `client` @ `1b9b625` (client `ci: require release signing secrets`) |
 | Client worktree branch | `phase-6-completion` |
-| Client worktree HEAD | `66fdef9 build: allow unsigned local release APK` |
-| Client merged into `origin/main`? | No. `git log --oneline origin/main..origin/phase-6-completion` lists 8 commits; `git branch -a --contains 66fdef9` returns only `phase-6-completion` (local + remote). |
-| Client uncommitted edits | `OutboxRepository.kt` and `OutboxSyncEngine.kt` modified; untracked `OutboxRepositoryValidationTest.kt` and `OutboxFailurePathTest.kt`. |
+| Client worktree HEAD | `1b9b625 ci: require release signing secrets` |
+| Client merged into `origin/main`? | No. `phase-6-completion` is pushed and remains open for review. |
+| Client uncommitted edits | None. |
 
-The server gitlink (`66fdef9`) matches the client worktree HEAD, so the server records the checked-out client state. PRs #4 and #5 referenced in the earlier journal are **unmerged branch work**, not landed on `origin/main`.
+The server gitlink (`1b9b625`) matches the client worktree HEAD, so the server records the checked-out client state. PR #6 remains open and is not landed on `origin/main`.
 
 ## Evidence actually collected
 
