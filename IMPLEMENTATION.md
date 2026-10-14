@@ -15,6 +15,38 @@ Required gates:
 - API/OpenAPI contract, examples, Hatch checks, non-root container and Compose assets.
 - Automated integration and isolated container smoke tests; physical push tests reported separately.
 
+## Approved `notifyr` CLI contract
+
+Notifyr-Server is the UnifiedPush application server. The CLI publishes through
+the existing authenticated `POST /v1/notifications` route; it must not create a
+separate push transport or bypass authorization, encryption, subscriptions, or
+durable delivery jobs.
+
+```bash
+notifyr ping --device=my_phone --msg "test message!"
+notifyr ping --device=my_phone --msg "Approve deploy?" --button=Accept --button=Deny
+notifyr ping --device=my_phone --msg "Reply?" --text-reply
+```
+
+- `--device` is the recipient user ID in `recipient_user_ids`, not an installation
+  ID or a direct physical-device selector.
+- `--msg` becomes the notification body; title is `Notifyr ping`.
+- Repeatable `--button LABEL` creates ordered `BUTTON` actions with generated,
+  unique action IDs and the supplied labels. Contract allows at most eight actions.
+- `--text-reply` adds one `TEXT_REPLY` action. Android submits entered text through
+  `POST /v1/responses`; publishers retrieve replies through
+  `GET /v1/apps/me/responses`.
+- `--urgency` is ignored. It is not in `notifications.v2`; it must not be sent as
+  an unknown API property or change delivery priority.
+- Each publication gets a fresh `request_id`; exact retries reuse that UUID and
+  identical payload.
+- Base URL and publisher credentials come from protected operator configuration.
+  Never print credentials, push endpoints, or sensitive worker diagnostics.
+
+Reject missing recipients, blank messages or button labels, and more than eight
+actions before publishing. API validation remains authoritative for byte limits,
+authorization, and action validity.
+
 Frontend examined: SuperPauly/Notifyr at d566bc7. Its transport is currently demo-only.
 Its decoder expects flat notifications and epoch-millisecond timestamps. Required
 client changes must be documented; do not weaken notifications.v2 or the specified
@@ -76,3 +108,49 @@ CORS/contact placeholders must be filled and reviewed before activation. The
 live VPS was not changed. See `docs/DEPLOYMENT.md` for deployment and consistent
 backup/restore, including the allocator high-water requirement when recovering
 an older snapshot.
+
+## Remaining work
+
+The server-side CLI implementation is complete. Remaining work is limited to
+physical Android/distributor validation and operator-specific deployment review.
+
+### Completed in this work session
+
+1. **`notifyr` CLI:** `pyproject.toml` exposes `notifyr`; `src/notifyr/cli.py`
+   implements `ping` through authenticated `POST /v1/notifications`.
+2. **CLI tests:** `tests/test_cli.py` covers payload mapping, ordered buttons,
+   text reply, ignored urgency, UUID generation, local validation, URL policy,
+   stable API/network errors, redirect rejection, and credential redaction.
+3. **Automated validation:** server pytest passes 76 tests; Android JVM tests
+   pass; Ruff, formatting, MyPy, Bandit, pre-commit, and Compose config checks
+   pass. No live deployment was changed.
+
+### Still required
+
+1. **Physical Android delivery:** provision and confirm a real Android
+   installation with an encrypted UnifiedPush distributor; exercise CLI ping,
+   display, button/text responses, publisher polling, expiry, duplicates, and
+   restart recovery. Report device evidence separately from automated tests.
+2. **Android instrumentation:** run migration/keystore instrumentation and
+   connected-device tests. Current workspace has no connected Android device;
+   physical distributor testing remains NOT RUN.
+3. **Deployment activation review:** replace proxy, CORS, VAPID contact,
+   push-origin, credential, backup, and restore placeholders; run checks in
+   `docs/DEPLOYMENT.md`. Keep live VPS untouched absent explicit approval.
+
+### Remaining-work acceptance gates
+
+- CLI publishes only through `/v1/notifications` and preserves existing
+  authorization, idempotency, encryption, and durable delivery behavior.
+- Android submits button responses without `text`, and text replies with validated
+  text, through `/v1/responses`.
+- Automated checks pass without contract weakening or sensitive-data leakage.
+- Automated tests are not represented as proof of physical notification display.
+
+## Current acceptance status
+
+- Server implementation and CLI: **complete locally**.
+- Android contract implementation: **present and JVM-tested**; physical and
+  connected-device gates remain **NOT RUN**.
+- Live deployment: **not performed**; operator configuration and approval remain
+  required.
