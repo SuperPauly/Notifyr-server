@@ -7,7 +7,7 @@ Last updated 2026-10-14 on server branch `phase-6-completion`. This document rec
 | Item | Value |
 |---|---|
 | Server branch | `phase-6-completion` (up to date with origin) |
-| Server HEAD | `fe832ac docs: record release verification` |
+| Server HEAD | `cb0c982 chore: advance client integration pointer` |
 | Server submodule gitlink | `client` @ `1b9b625` (client `ci: require release signing secrets`) |
 | Client worktree branch | `phase-6-completion` |
 | Client worktree HEAD | `1b9b625 ci: require release signing secrets` |
