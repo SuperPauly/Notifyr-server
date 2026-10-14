@@ -1,28 +1,28 @@
 # Android integration: blocked work
 
-Last updated 2026-10-13 on server branch `phase-1-2-typed-api-client`. This document records what is blocked, the exact commands and results that were actually collected, and the commands that were deliberately NOT RUN with the reason. Nothing here claims a gate that was not executed.
+Last updated 2026-10-14 on server branch `phase-6-completion`. This document records what is blocked, the exact commands and results that were actually collected, and the commands that were deliberately NOT RUN with the reason. Nothing here claims a gate that was not executed.
 
 ## Repository state
 
 | Item | Value |
 |---|---|
-| Server branch | `phase-1-2-typed-api-client` (up to date with origin) |
-| Server HEAD | `c9a0d9b docs: add Phase 6 section to ANDROID_DEFERRED_TESTING` |
-| Server submodule gitlink | `client` @ `4f66fc2` (client `chore: remove duplicate connector dependency`) |
-| Client worktree branch | `phase-6-response-outbox` |
-| Client worktree HEAD | `f7c0d70 fix: remove broken OutboxSyncWorkerTest` |
-| Client merged into `origin/main`? | No. `git log --oneline origin/main..origin/phase-6-response-outbox` lists 13 commits; `git branch -a --contains f7c0d70` returns only `phase-6-response-outbox` (local + remote). |
-| Client uncommitted edits | Phase 6 response/outbox, Phase 7 outbox/settings, and build configuration changes (dirty). |
+| Server branch | `phase-6-completion` (up to date with origin) |
+| Server HEAD | `fe832ac docs: record release verification` |
+| Server submodule gitlink | `client` @ `66fdef9` (client `build: allow unsigned local release APK`) |
+| Client worktree branch | `phase-6-completion` |
+| Client worktree HEAD | `66fdef9 build: allow unsigned local release APK` |
+| Client merged into `origin/main`? | No. `git log --oneline origin/main..origin/phase-6-completion` lists 8 commits; `git branch -a --contains 66fdef9` returns only `phase-6-completion` (local + remote). |
+| Client uncommitted edits | `OutboxRepository.kt` and `OutboxSyncEngine.kt` modified; untracked `OutboxRepositoryValidationTest.kt` and `OutboxFailurePathTest.kt`. |
 
-The server gitlink (`4f66fc2`) is an ancestor of the client worktree HEAD, so the server records the client one phase behind the checked-out worktree. PRs #4 and #5 referenced in the earlier journal are **unmerged branch work**, not landed on `origin/main`.
+The server gitlink (`66fdef9`) matches the client worktree HEAD, so the server records the checked-out client state. PRs #4 and #5 referenced in the earlier journal are **unmerged branch work**, not landed on `origin/main`.
 
 ## Evidence actually collected
 
 ```
 cd client
-git branch --show-current              # phase-6-response-outbox
-git rev-parse HEAD                     # f7c0d7053e6df2b7ce816984c62a5c89466d2c30
-git log --oneline origin/main..origin/phase-6-response-outbox   # 13 commits
+git branch --show-current              # phase-6-completion
+git rev-parse HEAD                     # 66fdef95dbf2dc6acf18eb97f6dd641c3bc9ef90
+git log --oneline origin/main..origin/phase-6-completion   # 8 commits
 ./gradlew :app:testDebugUnitTest --offline --console=plain
     # BUILD SUCCESSFUL; XML totals: 129 tests, 0 failures, 0 errors, 0 skipped
     # ErrorClassifierTest = 25 tests; ContractConformanceTest = 12; EnvelopeParserTest = 13
@@ -42,7 +42,7 @@ Toolchain at run time: `openjdk 25.0.4.1`, Gradle 9.3.1 wrapper, `local.properti
 
 ## Phase 6 blockers
 
-- **6.4 remaining rule.** 410-with-receipt-as-success is implemented in `OutboxSyncEngine`; it is covered by `OutboxRetryTest`. Phase 6 client changes are committed locally but still require push/PR and submodule update.
+- **6.4 remaining rule.** 410-with-receipt-as-success is implemented in `OutboxSyncEngine`; it is covered by `OutboxRetryTest`. Phase 6 client changes are committed and pushed to `origin/phase-6-completion`, and the server gitlink is updated to `66fdef9`. Remaining: merge into `origin/main`.
 
 ## Phase 7 blockers
 
@@ -56,7 +56,7 @@ All Phase 8 gates are NOT RUN.
 - **8.1 server regression gate.** Not run in this session.
 - **8.2 Android unit gate.** The current JVM suite is green (129 tests). Full named-gate coverage and Compose UI tests remain incomplete; placeholders `ExampleUnitTest.kt` and `ExampleRobolectricTest.kt` remain.
 - **8.3 instrumentation gate.** `app/src/androidTest/` holds only the placeholder `ExampleInstrumentedTest.kt`; `MigrationInstrumentedTest.kt` and `KeystoreInstrumentedTest.kt` do not exist.
-- **8.4 release build gate.** Not run; `google-services` decision unresolved.
+- **8.4 release build gate.** Unsigned `assembleRelease` succeeds; the permission/DEX-string scan and the `google-services` decision record remain open.
 - **8.5 physical device and distributor matrix.** Needs a target GrapheneOS device and a compatible distributor.
 
 ## NOT RUN register
@@ -66,6 +66,6 @@ All Phase 8 gates are NOT RUN.
 | `hatch run check` (server, 61 pytest cases) | Not run this session; only Android docs were in scope. |
 | `./gradlew :app:connectedDebugAndroidTest` | `No connected devices!`; no emulator or physical device attached. |
 | `./gradlew :app:assembleRelease --offline` | Produces `app-release-unsigned.apk`; signed production APK requires configured keystore secrets. |
-| `aapt2 dump permissions` / DEX `tok_` scan | Depends on a release APK that was not built. |
+| `aapt2 dump permissions` / DEX `tok_` scan | Not run; the unsigned release APK exists but the permission/DEX scan was not performed. |
 | Operator deployment validation (`docker compose config`, live `/v1/server-info`, VAPID subject, trusted-proxy IPs) | No configured Notifyr deployment; local port 8080 serves an unrelated process. |
 | Physical device matrix (register → challenge → deliver → respond → delete) | No device or distributor available. |
