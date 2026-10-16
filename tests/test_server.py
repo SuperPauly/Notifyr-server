@@ -101,6 +101,47 @@ def test_startup_auth_revocation_hash_only(server):
     assert client.get("/v1/me", headers=auth(users["alice"])).status_code == 401
 
 
+def test_request_and_auth_logs_are_sanitized(server, capsys):
+    client, _, users, apps = server
+    capsys.readouterr()
+
+    invalid_token = "invalid-token-secret"
+    assert (
+        client.get(
+            "/v1/me",
+            params={"query_secret": "query-value-secret"},
+            headers=auth(invalid_token),
+        ).status_code
+        == 401
+    )
+    assert (
+        client.post(
+            "/v1/notifications",
+            json={"body_secret": "payload-value-secret"},
+            headers=auth(invalid_token),
+        ).status_code
+        == 401
+    )
+    assert client.get("/v1/me", headers=auth(users["alice"])).status_code == 200
+    assert client.get("/v1/inbox", headers=auth(apps["app"])).status_code == 403
+
+    output = capsys.readouterr().err
+    assert '"event": "auth_attempt"' in output
+    assert '"event": "request"' in output
+    assert '"route": "/v1/me"' in output
+    assert '"route": "/v1/inbox"' in output
+    assert '"auth_outcome": "invalid"' in output
+    assert '"auth_outcome": "success"' in output
+    assert '"status": 401' in output
+    assert '"duration_ms":' in output
+    assert '"required_scope": "recipient"' in output
+    assert '"actual_scope": "publisher"' in output
+    assert invalid_token not in output
+    assert "query-value-secret" not in output
+    assert "payload-value-secret" not in output
+    assert "alice" not in output
+
+
 def test_authorized_fanout_dedup_idempotency_and_isolation(server):
     client, app, users, apps = server
     req = publication("alice", "bob", "alice")

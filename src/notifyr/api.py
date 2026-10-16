@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import sys
+import time
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
@@ -42,7 +43,19 @@ def safe_sink(message) -> None:
     allowed = {
         key: value
         for key, value in record["extra"].items()
-        if key in {"event", "job_id", "diagnostic"}
+        if key
+        in {
+            "event",
+            "job_id",
+            "diagnostic",
+            "method",
+            "route",
+            "status",
+            "duration_ms",
+            "auth_outcome",
+            "required_scope",
+            "actual_scope",
+        }
     }
     # Deliberately omit free-form message, exception and arbitrary extras entirely.
     sys.stderr.write(json.dumps({"level": record["level"].name, **allowed}) + "\n")
@@ -106,6 +119,31 @@ def create_app(settings: Settings | None = None, *, transport=None) -> FastAPI:
             request._body = bytes(body)
         return await call_next(request)
 
+    @app.middleware("http")
+    async def request_log(request: Request, call_next):
+        started = time.monotonic()
+        try:
+            response = await call_next(request)
+        except Exception:
+            route = getattr(request.scope.get("route"), "path", "unmatched")
+            logger.bind(
+                event="request",
+                method=request.method,
+                route=route,
+                status=500,
+                duration_ms=round((time.monotonic() - started) * 1000),
+            ).error("")
+            raise
+        route = getattr(request.scope.get("route"), "path", "unmatched")
+        logger.bind(
+            event="request",
+            method=request.method,
+            route=route,
+            status=response.status_code,
+            duration_ms=round((time.monotonic() - started) * 1000),
+        ).info("")
+        return response
+
     @app.exception_handler(Error)
     async def known_error(request: Request, exc: Error):
         headers = {"WWW-Authenticate": "Bearer"} if exc.status == 401 else None
@@ -122,18 +160,49 @@ def create_app(settings: Settings | None = None, *, transport=None) -> FastAPI:
 
     bearer = HTTPBearer(auto_error=False)
 
-    def principal(credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)]):
+    def principal(
+        request: Request,
+        credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+    ):
+        route = getattr(request.scope.get("route"), "path", "unmatched")
         if credentials is None or len(credentials.credentials) > 256:
+            outcome = "missing" if credentials is None else "invalid"
+            logger.bind(event="auth_attempt", route=route, auth_outcome=outcome).warning("")
             raise Error(401, "unauthorized")
-        return db.authenticate(credentials.credentials)
+        try:
+            identity = db.authenticate(credentials.credentials)
+        except Error:
+            logger.bind(event="auth_attempt", route=route, auth_outcome="invalid").warning("")
+            raise
+        logger.bind(
+            event="auth_attempt",
+            route=route,
+            auth_outcome="success",
+            actual_scope=identity["scope"],
+        ).info("")
+        return identity
 
-    def recipient(identity: Annotated[dict, Depends(principal)]) -> str:
+    def recipient(request: Request, identity: Annotated[dict, Depends(principal)]) -> str:
         if identity["scope"] != "recipient":
+            logger.bind(
+                event="auth_attempt",
+                route=getattr(request.scope.get("route"), "path", "unmatched"),
+                auth_outcome="scope_mismatch",
+                required_scope="recipient",
+                actual_scope=identity["scope"],
+            ).warning("")
             raise Error(403, "scope_required")
         return identity["user"]
 
-    def publisher(identity: Annotated[dict, Depends(principal)]) -> str:
+    def publisher(request: Request, identity: Annotated[dict, Depends(principal)]) -> str:
         if identity["scope"] != "publisher":
+            logger.bind(
+                event="auth_attempt",
+                route=getattr(request.scope.get("route"), "path", "unmatched"),
+                auth_outcome="scope_mismatch",
+                required_scope="publisher",
+                actual_scope=identity["scope"],
+            ).warning("")
             raise Error(403, "scope_required")
         return identity["app"]
 
